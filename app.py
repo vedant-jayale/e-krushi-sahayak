@@ -1,5 +1,4 @@
-from flask import Flask, render_template, request,make_response
-
+from flask import Flask, render_template, request
 import requests
 from bs4 import BeautifulSoup
 
@@ -7,11 +6,10 @@ app = Flask(__name__)
 
 # Mapping dictionary for header translations
 header_translations = {
-   'Sl no.':'क्र.',
+    'Sl no.': 'क्र.',
     'Commodity': 'धान्य / फसल',
-    'District Name':'जिल्हा',
-    'Market Name':'बाजार(Market)',
-
+    'District Name': 'जिल्हा',
+    'Market Name': 'बाजार(Market)',
     'Variety': 'प्रकार',
     'Grade': 'गुणवत्ता',
     'Min Price (Rs./Quintal)': 'किमत प्रति क्विंटल(₹) (किमान))',
@@ -52,7 +50,6 @@ def kapusvyavasthapan():
 def soiltesting():
     return render_template('soil-testing.html')
 
-
 @app.route('/get_prices', methods=['GET', 'POST'])
 def get_prices():
     data = None
@@ -75,34 +72,39 @@ def get_prices():
                f"Tx_Commodity={commodity}&Tx_State={state}&Tx_District={district}&Tx_Market={market}"
                f"&DateFrom={date_from}&DateTo={date_to}&Fr_Date={date_from}&To_Date={date_to}&Tx_Trend=0"
                f"&Tx_CommodityHead={commodity_name}&Tx_StateHead={state_name}&Tx_DistrictHead={district_name}&Tx_MarketHead={market_name}")
+
         headers = {
-         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-                 }
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.agmarknet.gov.in"
+        }
+
         response = requests.get(url, headers=headers)
-        print(response.content)  # Add this in the Render environment
-    
+        
+        # If request is successful
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
 
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        # Parsing logic to extract data from the page
-        data = []
-        table = soup.find('table', {'class': 'tableagmark_new'})
-        if table:
-            print("Table found")
-            headers = [translate_header(header.text.strip()) for header in table.find_all('th')]
-            print("Headers:", headers)
-            for row in table.find_all('tr')[1:]:
-                cols = row.find_all('td')
-                cols = [col.text.strip() for col in cols]
-                if 'No Data Found' in cols:
-                    data = None
-                    break
-                data.append(dict(zip(headers, cols)))
-                
+            # Parsing logic to extract data from the page
+            data = []
+            table = soup.find('table', {'class': 'tableagmark_new'})
+            if table:
+                print("Table found")
+                headers = [translate_header(header.text.strip()) for header in table.find_all('th')]
+                print("Headers:", headers)
+                for row in table.find_all('tr')[1:]:
+                    cols = row.find_all('td')
+                    cols = [col.text.strip() for col in cols]
+                    if 'No Data Found' in cols:
+                        data = None
+                        break
+                    data.append(dict(zip(headers, cols)))
+            else:
+                print("No table found")
+                data = None  # If no table is found, return None or empty data
         else:
-            print("No table found")
-            # If no table is found, return None or empty data
-            data = None      
+            print(f"Failed to retrieve data. Status code: {response.status_code}")
+            data = None
 
     return render_template('index.html', data=data, form_submitted=form_submitted)
 
