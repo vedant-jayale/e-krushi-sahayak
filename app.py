@@ -79,34 +79,37 @@ def get_prices():
             "Referer": "https://www.agmarknet.gov.in"
         }
 
-        response = requests.get(url, headers=headers)
-        
-        # If request is successful
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-
-            # Parsing logic to extract data from the page
-            data = []
-            table = soup.find('table', {'class': 'tableagmark_new'})
-            if table:
-                print("Table found")
-                headers = [translate_header(header.text.strip()) for header in table.find_all('th')]
-                print("Headers:", headers)
-                for row in table.find_all('tr')[1:]:
-                    cols = row.find_all('td')
-                    cols = [col.text.strip() for col in cols]
-                    if 'No Data Found' in cols:
-                        data = None
-                        break
-                    data.append(dict(zip(headers, cols)))
+        try:
+            # Test connection to the site
+            test_response = requests.get('https://www.agmarknet.gov.in', timeout=10)
+            if test_response.status_code != 200:
+                print(f"Error: Unable to connect to Agmarknet. Status Code: {test_response.status_code}")
+                return render_template('error.html', message="Unable to connect to Agmarknet website.")
+            
+            # Fetch market data
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.content, 'html.parser')
+                
+                # Extract data (adjust selectors as needed)
+                table = soup.find('table', {'class': 'table-class'})  # Replace 'table-class' with actual class name
+                if table:
+                    headers = [translate_header(th.text.strip()) for th in table.find_all('th')]
+                    rows = []
+                    for row in table.find_all('tr')[1:]:
+                        cols = [col.text.strip() for col in row.find_all('td')]
+                        rows.append(cols)
+                    data = {'headers': headers, 'rows': rows}
+                else:
+                    print("No table found in the response.")
             else:
-                print("No table found")
-                data = None  # If no table is found, return None or empty data
-        else:
-            print(f"Failed to retrieve data. Status code: {response.status_code}")
-            data = None
+                print(f"Error fetching data. Status Code: {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            print(f"Error during requests to Agmarknet: {e}")
+            return render_template('error.html', message="An error occurred while fetching data.")
 
-    return render_template('index.html', data=data, form_submitted=form_submitted)
+    return render_template('get_prices.html', data=data, form_submitted=form_submitted)
+
 
 
 if __name__ == '__main__':
