@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request
 import requests
 from bs4 import BeautifulSoup
+import logging
 
 app = Flask(__name__)
 
@@ -21,6 +22,9 @@ header_translations = {
 # Function to translate headers
 def translate_header(header):
     return header_translations.get(header, header)
+
+logging.basicConfig(level=logging.DEBUG    
+    
 
 @app.route('/')
 def home():
@@ -68,52 +72,45 @@ def get_prices():
         district_name = request.form['district_name']
         market_name = request.form['market_name']
 
+        # Construct the URL for Agmarknet with the parameters
         url = (f"https://agmarknet.gov.in/SearchCmmMkt.aspx?"
                f"Tx_Commodity={commodity}&Tx_State={state}&Tx_District={district}&Tx_Market={market}"
                f"&DateFrom={date_from}&DateTo={date_to}&Fr_Date={date_from}&To_Date={date_to}&Tx_Trend=0"
                f"&Tx_CommodityHead={commodity_name}&Tx_StateHead={state_name}&Tx_DistrictHead={district_name}&Tx_MarketHead={market_name}")
 
-        # Scraper API setup
-        scraper_api_url = "https://api.scraperapi.com"
-        api_key = "abbd392168a5681912e35e5698f9db14"  # Your Scraper API key
-        params = {
-            'api_key': api_key,
-            'url': url  # The Agmarknet URL you want to scrape
-        }
-
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://agmarknet.gov.in",
-            "Connection": "keep-alive"
-        }
+        # Scraper API URL with your API key
+        scraper_api_url = f"http://api.scraperapi.com?api_key=abbd392168a5681912e35e5698f9db14&url={url}"
 
         try:
-            # Send request through Scraper API
-            response = requests.get(scraper_api_url, params=params, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.content, 'html.parser')
-                
-                # Extract data (adjust selectors as needed)
-                table = soup.find('table', {'class': 'tableagmark_new'})  # Adjust class name based on the actual table
-                if table:
-                    headers = [translate_header(th.text.strip()) for th in table.find_all('th')]
-                    rows = []
-                    for row in table.find_all('tr')[1:]:
-                        cols = [col.text.strip() for col in row.find_all('td')]
-                        if 'No Data Found' in cols:
-                            data = None
-                            break
-                        rows.append(dict(zip(headers, cols)))
-                    data = {'headers': headers, 'rows': rows}
-                else:
-                    data = None
+            logging.debug(f"Sending request to Scraper API: {scraper_api_url}")
+            # Make the request to Scraper API with timeout and retries
+            response = requests.get(scraper_api_url, timeout=30)
+            response.raise_for_status()  # Check if request was successful
+
+            logging.debug(f"Received response with status code: {response.status_code}")
+
+            # Parse the HTML content returned by Scraper API
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Parsing logic to extract data from the page
+            data = []
+            table = soup.find('table', {'class': 'tableagmark_new'})
+            if table:
+                headers = [translate_header(header.text.strip()) for header in table.find_all('th')]
+                for row in table.find_all('tr')[1:]:
+                    cols = row.find_all('td')
+                    cols = [col.text.strip() for col in cols]
+                    if 'No Data Found' in cols:
+                        data = None
+                        break
+                    data.append(dict(zip(headers, cols)))
             else:
                 data = None
+
+        except requests.exceptions.Timeout:
+            logging.error("The request timed out.")
         except requests.exceptions.RequestException as e:
-            print(f"Error during requests: {e}")
-            data = None
+            logging.error(f"Error during request: {e}")
 
     return render_template('index.html', data=data, form_submitted=form_submitted)
 
