@@ -23,7 +23,7 @@ header_translations = {
 def translate_header(header):
     return header_translations.get(header, header)
 
-logging.basicConfig(level=logging.DEBUG    
+logging.basicConfig(level=logging.DEBUG)    
     
 
 @app.route('/')
