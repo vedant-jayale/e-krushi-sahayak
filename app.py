@@ -84,7 +84,7 @@ def get_prices():
         try:
             logging.debug(f"Sending request to Scraper API: {scraper_api_url}")
             # Make the request to Scraper API with timeout and retries
-            response = requests.get(scraper_api_url, timeout=30)
+            response = requests.get(scraper_api_url, timeout=40)
             response.raise_for_status()  # Check if request was successful
 
             logging.debug(f"Received response with status code: {response.status_code}")
