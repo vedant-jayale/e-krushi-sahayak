@@ -73,47 +73,49 @@ def get_prices():
                f"&DateFrom={date_from}&DateTo={date_to}&Fr_Date={date_from}&To_Date={date_to}&Tx_Trend=0"
                f"&Tx_CommodityHead={commodity_name}&Tx_StateHead={state_name}&Tx_DistrictHead={district_name}&Tx_MarketHead={market_name}")
 
+        # Scraper API setup
+        scraper_api_url = "https://api.scraperapi.com"
+        api_key = "abbd392168a5681912e35e5698f9db14"  # Your Scraper API key
+        params = {
+            'api_key': api_key,
+            'url': url  # The Agmarknet URL you want to scrape
+        }
+
         headers = {
-            
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
             "Accept-Language": "en-US,en;q=0.9",
             "Referer": "https://agmarknet.gov.in",
             "Connection": "keep-alive"
-
         }
 
         try:
-            # Test connection to the site
-            test_response = requests.get('https://www.agmarknet.gov.in', timeout=10)
-            if test_response.status_code != 200:
-                print(f"Error: Unable to connect to Agmarknet. Status Code: {test_response.status_code}")
-                return render_template('error.html', message="Unable to connect to Agmarknet website.")
+            # Send request through Scraper API
+            response = requests.get(scraper_api_url, params=params, headers=headers, timeout=10)
             
-            # Fetch market data
-            response = requests.get(url, headers=headers, timeout=10)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.content, 'html.parser')
                 
                 # Extract data (adjust selectors as needed)
-                table = soup.find('table', {'class': 'table-class'})  # Replace 'table-class' with actual class name
+                table = soup.find('table', {'class': 'tableagmark_new'})  # Adjust class name based on the actual table
                 if table:
                     headers = [translate_header(th.text.strip()) for th in table.find_all('th')]
                     rows = []
                     for row in table.find_all('tr')[1:]:
                         cols = [col.text.strip() for col in row.find_all('td')]
-                        rows.append(cols)
+                        if 'No Data Found' in cols:
+                            data = None
+                            break
+                        rows.append(dict(zip(headers, cols)))
                     data = {'headers': headers, 'rows': rows}
                 else:
-                    print("No table found in the response.")
+                    data = None
             else:
-                print(f"Error fetching data. Status Code: {response.status_code}")
+                data = None
         except requests.exceptions.RequestException as e:
-            print(f"Error during requests to Agmarknet: {e}")
-            return render_template('error.html', message="An error occurred while fetching data.")
+            print(f"Error during requests: {e}")
+            data = None
 
-    return render_template('get_prices.html', data=data, form_submitted=form_submitted)
-
-
+    return render_template('index.html', data=data, form_submitted=form_submitted)
 
 if __name__ == '__main__':
     app.run(debug=True)
